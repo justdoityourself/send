@@ -7,6 +7,8 @@
 
 'use strict'
 
+let CACHE = {};
+
 /**
  * Module dependencies.
  * @private
@@ -28,6 +30,7 @@ var parseRange = require('range-parser')
 var path = require('path')
 var statuses = require('statuses')
 var Stream = require('stream')
+var Readable = Stream.Readable;
 var util = require('util')
 
 /**
@@ -778,6 +781,29 @@ SendStream.prototype.sendIndex = function sendIndex (path) {
   next()
 }
 
+function createBufferedStream(file,o) 
+{ 
+    let buffer;
+    if(file in CACHE)
+        buffer = CACHE[file];
+    else
+        buffer = fs.readFileSync(file);
+
+    var stream = new Readable(o);
+
+    if(o.start || o.end)
+    {
+        let s = o.start || 0;
+        let e = o.end+1 || buffer.length;
+        stream.push(buffer.slice(s,e));
+    }
+    else
+        stream.push(buffer);
+    stream.push(null);
+
+    return stream;
+}
+
 /**
  * Stream `path` to the response.
  *
@@ -793,7 +819,9 @@ SendStream.prototype.stream = function stream (path, options) {
   var res = this.res
 
   // pipe
-  var stream = fs.createReadStream(path, options)
+  //var stream = fs.createReadStream(path, options)
+  let stream = createBufferedStream(path,options);
+
   this.emit('stream', stream)
   stream.pipe(res)
 
